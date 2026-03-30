@@ -27,7 +27,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="text-brand text-2xl font-bold mb-1">Forgemeo</div>
+          <div className="text-brand text-2xl font-bold mb-1">Forgememo</div>
           <p className="text-muted text-sm">Sign in to your account</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">

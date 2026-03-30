@@ -36,7 +36,7 @@ export default function SettingsClient({ provider, traces }: SettingsClientProps
           <div className="text-white text-lg font-medium mb-4">{provider}</div>
           <p className="text-muted text-sm">To change your provider, run:</p>
           <code className="block bg-bg border border-border rounded px-3 py-2 text-green-400 text-xs mt-2 font-mono">
-            forgemeo config
+            forgememo config
           </code>
         </div>
       )}
@@ -46,7 +46,7 @@ export default function SettingsClient({ provider, traces }: SettingsClientProps
           {traces.length === 0 ? (
             <div className="bg-card border border-border rounded-lg p-5">
               <p className="text-muted text-sm">No synced traces yet.</p>
-              <p className="text-muted text-sm mt-2">Run <code className="text-green-400 font-mono">forgemeo sync push</code> to upload your local traces.</p>
+              <p className="text-muted text-sm mt-2">Run <code className="text-green-400 font-mono">forgememo sync push</code> to upload your local traces.</p>
             </div>
           ) : (
             <div className="bg-card border border-border rounded-lg overflow-hidden">

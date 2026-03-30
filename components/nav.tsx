@@ -16,7 +16,7 @@ export default function Nav({ current }: { current: 'dashboard' | 'billing' | 's
   ]
   return (
     <nav className="bg-card border-b border-border px-6 py-3 flex items-center gap-5">
-      <span className="text-brand font-bold text-base">Forgemeo</span>
+      <span className="text-brand font-bold text-base">Forgememo</span>
       {navItems.map(item => (
         <Link
           key={item.href}
