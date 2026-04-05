@@ -4,7 +4,11 @@ import { getStats, getActivity } from '@/lib/api'
 import Nav from '@/components/nav'
 import BillingClient from './billing-client'
 
-export default async function BillingPage() {
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: { source?: string }
+}) {
   const token = getSession()
   if (!token) redirect('/login')
 
@@ -13,7 +17,12 @@ export default async function BillingPage() {
   return (
     <div>
       <Nav current="billing" />
-      <BillingClient token={token} balance={stats.balance_usd} runs={runs} />
+      <BillingClient
+        token={token}
+        balance={stats.balance_usd}
+        runs={runs}
+        source={searchParams.source}
+      />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { sendMagicLink } from '@/lib/api'
 
 export default function LoginPage() {
@@ -8,14 +8,17 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const source = searchParams.get('source') ?? undefined
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
     try {
-      await sendMagicLink(email)
-      router.push('/auth/verify')
+      await sendMagicLink(email, source)
+      const next = source ? `/auth/verify?source=${source}` : '/auth/verify'
+      router.push(next)
     } catch {
       setError('Failed to send link. Check your email and try again.')
     } finally {
@@ -28,7 +31,9 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <div className="text-brand text-2xl font-bold mb-1">Forgememo</div>
-          <p className="text-muted text-sm">Sign in to your account</p>
+          <p className="text-muted text-sm">
+            {source === 'cli' ? 'Sign in to activate your CLI' : 'Sign in to your account'}
+          </p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <input

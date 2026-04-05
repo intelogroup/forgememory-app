@@ -43,12 +43,17 @@ export function getSyncedTraces(token: string) {
   return apiFetch<any[]>('/v1/sync/pull', { headers: { Authorization: `Bearer ${token}` } })
 }
 
-export async function sendMagicLink(email: string): Promise<void> {
-  const callbackUrl = `${window.location.origin}/auth/callback`
+export function getApiKey(token: string): Promise<{ api_key: string }> {
+  return apiFetch<{ api_key: string }>('/v1/user/api-key', { headers: { Authorization: `Bearer ${token}` } })
+}
+
+export async function sendMagicLink(email: string, source?: string): Promise<void> {
+  const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
+  if (source) callbackUrl.searchParams.set('source', source)
   const res = await fetch(`${API}/webapp-auth/send-link`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, callback_url: callbackUrl }),
+    body: JSON.stringify({ email, callback_url: callbackUrl.toString() }),
   })
   if (!res.ok) throw new Error(`Failed to send link: ${res.status}`)
 }

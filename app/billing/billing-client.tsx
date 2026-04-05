@@ -16,9 +16,10 @@ interface BillingClientProps {
   token: string
   balance: number
   runs: Run[]
+  source?: string
 }
 
-export default function BillingClient({ token, balance, runs }: BillingClientProps) {
+export default function BillingClient({ token, balance, runs, source }: BillingClientProps) {
   const [selected, setSelected] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -28,10 +29,19 @@ export default function BillingClient({ token, balance, runs }: BillingClientPro
     setLoading(true)
     setError('')
     try {
+      if (source === 'cli') {
+        localStorage.setItem('forge_source', 'cli')
+        localStorage.setItem('forge_token', token)
+      }
+
+      const successUrl = source === 'cli'
+        ? `${window.location.origin}/billing/success?source=cli`
+        : `${window.location.origin}/billing?success=1`
+
       const res = await fetch(`${API}/v1/checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ pack_id: selected }),
+        body: JSON.stringify({ pack_id: selected, success_url: successUrl }),
       })
       if (!res.ok) throw new Error(`Checkout failed (${res.status})`)
       const { url } = await res.json()
@@ -46,6 +56,13 @@ export default function BillingClient({ token, balance, runs }: BillingClientPro
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-8">
+      {source === 'cli' && (
+        <div className="bg-brand/10 border border-brand/30 rounded-lg p-4 mb-6 text-sm">
+          <span className="font-medium text-brand">CLI setup</span>
+          <span className="text-muted ml-2">Purchase credits to activate your CLI. Minimum $5.</span>
+        </div>
+      )}
+
       <div className="bg-card border border-border rounded-lg p-5 mb-6">
         <div className="text-muted text-xs uppercase tracking-wide mb-1">Current Balance</div>
         <div className="text-brand text-3xl font-bold">${balance.toFixed(2)}</div>
