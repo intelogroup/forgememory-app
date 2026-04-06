@@ -1,132 +1,64 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Next.js 14 (App Router) dashboard for Forgememo. Users log in via magic link, buy credits, monitor usage.
 
-## What this is
-
-Next.js 14 (App Router) web dashboard for Forgememo — the managed-service frontend.
-Users log in via magic link, buy credit packs, and monitor their distill usage.
-
-**Production URL:** `https://forgememory-app.vercel.app`
-**Deployed on:** Vercel (project `forgememory-app`, team `intelogroups-projects`, auto-deploy from `main`)
-**Backend API:** `https://forgememo-server.onrender.com` (Python FastAPI on Render)
-
----
+**Production:** `https://forgememory-app.vercel.app` — auto-deploys on push to `main`
+**Backend:** `https://forgememo-server.onrender.com` (Go, port 8000 locally)
 
 ## Run locally
 
 ```bash
-npm install
-
-# Point at production backend (easiest — no local server needed)
-echo 'NEXT_PUBLIC_API_URL=https://forgememo-server.onrender.com' > .env.local
-
-# Or point at local backend (must be running on port 8000)
 echo 'NEXT_PUBLIC_API_URL=http://localhost:8000' > .env.local
-
 npm run dev   # http://localhost:3000
 ```
 
----
-
 ## Auth flow
 
-1. User visits any protected page → `middleware.ts` checks for `fm_token` cookie → redirects to `/login`
-2. `/login` — user enters email → `sendMagicLink()` POSTs to `NEXT_PUBLIC_API_URL/webapp-auth/send-link`
-3. Backend emails a link → user clicks → hits `GET /webapp-auth/verify?token=...` on backend
-4. Backend issues JWT, redirects to `/auth/callback?token=<jwt>`
-5. `/auth/callback` — sets `fm_token` cookie, redirects to `/dashboard`
+### Web login
+1. `/login` → `sendMagicLink()` → `POST /webapp-auth/send-link` (backend creates user, emails link)
+2. User clicks link → `GET /auth/callback?token=<api_key>&source=<source>` → sets `fm_token` cookie
 
-All API calls send `Authorization: Bearer <fm_token>` header (read from cookie via `lib/auth.ts`).
+### CLI login (`forge login`)
+1. CLI starts local callback server on random port, opens `/cli-auth?callback=<url>&state=<hex>`
+2. `/cli-auth` sets `cli_callback` + `cli_state` cookies (10 min TTL), redirects to `/login?source=cli`
+3. After magic link → `/auth/callback` reads cookies → redirects browser to CLI callback URL with `?token=&state=`
+4. CLI receives token, saves config. If `--purchase`, opens `/billing/cli-setup` with a fresh payment callback URL.
 
----
+### CLI payment (`forge login --purchase`)
+1. `/billing/cli-setup` stores `cli_callback` + `cli_state` in sessionStorage, redirects to `/billing?source=cli`
+2. User picks pack → Stripe checkout (or `/checkout/test` in dev) → `/billing/success?source=cli`
+3. `CliCallback` reads sessionStorage, fetches CLI payment callback URL → CLI prints "Payment confirmed."
+
+**Dev mode:** backend returns `magic_link` in `/webapp-auth/send-link` response when `RESEND_API_KEY` unset. `/checkout/test` simulates payment without Stripe.
 
 ## Routes
 
-| Route | Auth | Purpose |
-|-------|------|---------|
-| `/login` | public | Email magic-link form |
-| `/auth/callback` | public | Receives JWT from backend, sets cookie |
-| `/auth/verify` | public | "Check your email" holding page |
-| `/dashboard` | protected | Usage stats, balance, recent runs |
-| `/billing` | protected | Buy credit packs (Stripe Checkout) |
-| `/billing/success` | protected | Post-purchase confirmation |
-| `/settings` | protected | Provider info, API key |
-
----
+| Route | Public | Purpose |
+|-------|--------|---------|
+| `/login` | yes | Magic-link form |
+| `/cli-auth` | yes | CLI OAuth entry — sets cookies, redirects to login |
+| `/auth/callback` | yes | Sets `fm_token` cookie; redirects CLI or web |
+| `/auth/verify` | yes | "Check your email" page |
+| `/checkout/test` | yes | Dev-mode payment simulator |
+| `/billing/cli-setup` | protected | Stores CLI payment callback, redirects to billing |
+| `/dashboard` | protected | Usage stats + balance |
+| `/billing` | protected | Buy credit packs |
+| `/billing/success` | protected | Post-payment; calls back to CLI if source=cli |
+| `/settings` | protected | API key, provider info |
 
 ## Key files
 
 | File | Purpose |
 |------|---------|
-| `middleware.ts` | Edge auth guard — redirects to `/login` if no `fm_token` cookie |
-| `lib/api.ts` | All backend fetch calls — reads `NEXT_PUBLIC_API_URL` |
-| `lib/auth.ts` | `getSession()` — reads `fm_token` from Next.js cookie store |
-| `app/login/page.tsx` | Magic-link login form (wrapped in Suspense for `useSearchParams`) |
-| `app/auth/callback/` | Sets cookie after magic-link verify redirect |
-| `app/dashboard/` | Stats: total runs, balance, recent activity |
-| `app/billing/` | Stripe Checkout trigger + pack display |
-| `app/settings/` | User settings page |
-| `vercel.json` | Rewrites for `/api/v1/*` and `/api/auth/*` |
+| `middleware.ts` | Auth guard — public paths: `/login`, `/auth/*`, `/cli-auth`, `/checkout/*` |
+| `lib/api.ts` | All backend calls; `sendMagicLink` passes `source` through callback URL |
+| `app/cli-auth/route.ts` | Sets cookies, redirects to `/login?source=cli` |
+| `app/auth/callback/route.ts` | Reads `cli_callback` cookie → redirects to CLI or dashboard |
+| `app/billing/cli-setup/page.tsx` | Writes sessionStorage, redirects to billing |
+| `app/billing/success/cli-callback.tsx` | Fires fetch to CLI payment callback (CORS, once-only ref guard) |
 
----
-
-## Test the full flow manually
-
-```bash
-# 1. Start dev server
-NEXT_PUBLIC_API_URL=https://forgememo-server.onrender.com npm run dev
-
-# 2. Open http://localhost:3000
-# → Should redirect to /login (no fm_token cookie)
-
-# 3. Enter email → click "Send magic link"
-# → Check inbox for link from noreply@forgememo.com
-
-# 4. Click link → redirected to /auth/callback → then /dashboard
-# → Should see balance_usd and total_runs
-
-# 5. Go to /billing → click a pack → Stripe test checkout
-#    Use card: 4242 4242 4242 4242, any future date, any CVC
-# → After payment, balance should increase
-
-# 6. Go to /settings → verify provider shows "forgemem"
-```
-
----
-
-## Test against production backend directly
-
-```bash
-BASE=https://forgememo-server.onrender.com
-
-# Send magic link
-curl -X POST $BASE/webapp-auth/send-link \
-  -H "Content-Type: application/json" \
-  -d '{"email":"you@example.com","callback_url":"https://forgememory-app.vercel.app/auth/callback"}'
-
-# After clicking link in email, copy token from URL then:
-TOKEN=<jwt>
-curl $BASE/v1/stats -H "Authorization: Bearer $TOKEN"
-curl $BASE/v1/activity -H "Authorization: Bearer $TOKEN"
-curl $BASE/v1/balance -H "Authorization: Bearer $TOKEN"
-```
-
----
-
-## Vercel env vars
+## Env vars
 
 | Variable | Value |
 |----------|-------|
-| `NEXT_PUBLIC_API_URL` | `https://forgememo-server.onrender.com` |
-
----
-
-## Deploy
-
-Any push to `main` on `intelogroup/forgememory-app` triggers a Vercel production deploy automatically.
-
-```bash
-# Manual deploy (from repo root)
-vercel deploy --prod
-```
+| `NEXT_PUBLIC_API_URL` | `https://forgememo-server.onrender.com` (or `http://localhost:8000`) |
