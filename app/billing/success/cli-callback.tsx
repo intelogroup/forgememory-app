@@ -1,21 +1,37 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export default function CliCallback({ apiKey, source }: { apiKey: string; source?: string }) {
   const [status, setStatus] = useState<'pending' | 'done' | 'fallback'>('pending')
+  const called = useRef(false)
 
   useEffect(() => {
     if (source !== 'cli') {
       setStatus('done')
       return
     }
-    fetch(`http://localhost:9876/callback?api_key=${encodeURIComponent(apiKey)}`)
+    // Guard against React strict mode double-invoke in dev
+    if (called.current) return
+    called.current = true
+
+    // cli_callback and cli_state are stored by /billing/cli-setup in sessionStorage
+    const cliCallback = sessionStorage.getItem('cli_callback')
+    const cliState = sessionStorage.getItem('cli_state')
+    if (!cliCallback) {
+      setStatus('fallback')
+      return
+    }
+    const dest = new URL(cliCallback)
+    if (cliState) dest.searchParams.set('state', cliState)
+    fetch(dest.toString())
       .then(r => {
         if (r.ok) setStatus('done')
         else setStatus('fallback')
       })
       .catch(() => setStatus('fallback'))
 
+    sessionStorage.removeItem('cli_callback')
+    sessionStorage.removeItem('cli_state')
     localStorage.removeItem('forge_source')
     localStorage.removeItem('forge_token')
   }, [apiKey, source])

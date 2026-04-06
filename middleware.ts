@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const isPublic = pathname === '/login' || pathname.startsWith('/auth/')
+  const isPublic = pathname === '/login' || pathname.startsWith('/auth/') || pathname === '/cli-auth' || pathname.startsWith('/checkout/')
   if (!isPublic && !request.cookies.get('fm_token')) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
